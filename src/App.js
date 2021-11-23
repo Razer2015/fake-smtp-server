@@ -12,7 +12,7 @@ import {
 } from 'reactstrap';
 import moment from 'moment';
 
-function openAttachment (attachment) {
+function openAttachment(attachment) {
   var byteArray = new Uint8Array(attachment.content.data);
   var file = new Blob([byteArray], { type: attachment.contentType });
   var fileURL = URL.createObjectURL(file);
@@ -43,11 +43,19 @@ const Email = ({ email, isOpen, onToggle }) => {
         <ListGroup className="list-group-flush">
           <ListGroupItem>
             <strong>From:&nbsp;</strong>
-            <span dangerouslySetInnerHTML={{ __html: email.from.html }} />
+            <span dangerouslySetInnerHTML={{ __html: email.from ? email.from.html : '<span>None</span>' }} />
           </ListGroupItem>
           <ListGroupItem>
-            <strong>To:&nbsp;</strong>
-            <span dangerouslySetInnerHTML={{ __html: email.to.html }} />
+            <strong>To ({email.to ? email.to.value.length : 0}):&nbsp;</strong>
+            <span dangerouslySetInnerHTML={{ __html: email.to ? email.to.html : '<span>None</span>' }} />
+          </ListGroupItem>
+          <ListGroupItem>
+            <strong>Cc ({email.cc ? email.cc.value.length : 0}):&nbsp;</strong>
+            <span dangerouslySetInnerHTML={{ __html: email.cc ? email.cc.html : '<span>None</span>' }} />
+          </ListGroupItem>
+          <ListGroupItem>
+            <strong>Bcc ({email.bcc ? email.bcc.value.length : 0}):&nbsp;</strong>
+            <span dangerouslySetInnerHTML={{ __html: email.bcc ? email.bcc.html : '<span>None</span>' }} />
           </ListGroupItem>
           <ListGroupItem>
             <strong>Date:&nbsp;</strong>
@@ -92,14 +100,14 @@ class App extends Component {
   };
 
   componentDidMount() {
-      let request = {
-          credentials: 'same-origin',
-      };
-      fetch(`${baseUrl}/api/emails`, request)
-          .then(resp => resp.json())
-          .then(emails => {
-              this.setState({emails: emails});
-          });
+    let request = {
+      credentials: 'same-origin',
+    };
+    fetch(`${baseUrl}/api/emails`, request)
+      .then(resp => resp.json())
+      .then(emails => {
+        this.setState({ emails: emails });
+      });
   }
 
   handleToggle = email => () => {
@@ -121,18 +129,18 @@ class App extends Component {
             Emails
           </h1>
         </header>
-        { hasEmails && this.state.emails.map(email => (
+        {hasEmails && this.state.emails.map(email => (
           <Email email={email}
-                 isOpen={this.state.activeEmail === email.messageId}
-                 onToggle={this.handleToggle(email)}
-                 key={email.messageId} />
-          ))
+            isOpen={this.state.activeEmail === email.messageId}
+            onToggle={this.handleToggle(email)}
+            key={email.messageId} />
+        ))
         }
-        { isEmpty && (
+        {isEmpty && (
           <div className="alert alert-info">
             Empty mailbox
           </div>
-        ) }
+        )}
       </Container>
     );
   }

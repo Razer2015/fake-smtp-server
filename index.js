@@ -23,8 +23,8 @@ const whitelist = config.whitelist ? config.whitelist.split(',') : [];
 
 let users = null;
 if (config.auth && !/.+:.+/.test(config.auth)) {
-    cli.error("Please provide authentication details in USERNAME:PASSWORD format");
-    console.log(process.exit(1))
+  cli.error("Please provide authentication details in USERNAME:PASSWORD format");
+  console.log(process.exit(1))
 }
 if (config.auth) {
   let authConfig = config.auth.split(":");
@@ -51,7 +51,7 @@ const server = new SMTPServer({
     });
   },
   onData(stream, session, callback) {
-    parseEmail(stream).then(
+    parseEmail(stream, session.envelope.rcptTo).then(
       mail => {
         cli.debug(JSON.stringify(mail, null, 2));
 
@@ -77,8 +77,26 @@ function formatHeaders(headers) {
   return result;
 }
 
-function parseEmail(stream) {
+function getBccEmails(email, rcptTo) {
+  if (email.to) rcptTo = rcptTo.filter(recipient => !email.to.value.some(t => t.address === recipient.address))
+  if (email.cc) rcptTo = rcptTo.filter(recipient => !email.cc.value.some(t => t.address === recipient.address))
+
+  if (!rcptTo || !rcptTo.length) return null
+
+  return {
+    value: rcptTo,
+    html: rcptTo.map(r => `<span class="mp_address_group"><a href="mailto:${r.address}" class="mp_address_email">${r.address}</a></span>`).join([separator = ', ']),
+    text: rcptTo.map(r => r.address).join([separator = ', '])
+  }
+}
+
+function parseEmail(stream, rcptTo) {
   return simpleParser(stream).then(email => {
+    const bccMails = getBccEmails(email, rcptTo)
+    if (bccMails) {
+      email.bcc = bccMails
+    }
+
     if (config.headers) {
       email.headers = formatHeaders(email.headers);
     } else {
@@ -96,17 +114,17 @@ server.listen(config['smtp-port'], config['smtp-ip']);
 
 const app = express();
 
-app.use(function(req, res, next) {
+app.use(function (req, res, next) {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   next();
 });
 
 if (users) {
-    app.use(basicAuth({
-        users: users,
-        challenge: true
-    }));
+  app.use(basicAuth({
+    users: users,
+    challenge: true
+  }));
 }
 
 const buildDir = path.join(__dirname, 'build');
@@ -123,6 +141,10 @@ function emailFilter(filter) {
       if (filter.until && date.isAfter(filter.until)) {
         return false;
       }
+    }
+
+    if (!email.to || !email.from) {
+      return false;
     }
 
     if (filter.to && _.every(email.to.value, to => to.address !== filter.to)) {
@@ -142,12 +164,12 @@ app.get('/api/emails', (req, res) => {
 });
 
 app.delete('/api/emails', (req, res) => {
-    mails.length = 0;
-    res.send();
+  mails.length = 0;
+  res.send();
 });
 
 app.listen(config['http-port'], config['http-ip'], () => {
-  cli.info("HTTP server listening on http://" + config['http-ip'] +  ":" + config['http-port']);
+  cli.info("HTTP server listening on http://" + config['http-ip'] + ":" + config['http-port']);
 });
 
 cli.info("SMTP server listening on " + config['smtp-ip'] + ":" + config['smtp-port']);
